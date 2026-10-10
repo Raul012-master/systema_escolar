@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
@@ -11,9 +13,11 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "firebase-admin": "^13.6.0",
-    "nodemailer": "^7.0.10"
+    "nodemailer": "^7.0.10",
+    "sistema-escolar": "file:.."
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
