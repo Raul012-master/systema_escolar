@@ -1,0 +1,1847 @@
+<!-- ══════════════════════════════════════════════════════════════
+     Loading screen
+══════════════════════════════════════════════════════════════ -->
+@if (authStatus() === 'loading') {
+  <div class="ph-loading-screen">
+    <div class="ph-spinner ph-spinner-lg" style="color: var(--ph-primary)"></div>
+    <p style="color: var(--ph-secondary); font-size:14px; margin:0">Conectando con el sistema escolar…</p>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     Server unavailable
+══════════════════════════════════════════════════════════════ -->
+@if (authStatus() === 'unavailable') {
+  <div class="ph-auth">
+    <div class="ph-auth-card" style="text-align:center">
+      <div class="ph-auth-logo">
+        <div class="ph-auth-logo__icon"><i class="bi bi-exclamation-triangle"></i></div>
+        <h1>Sin conexión</h1>
+        <p>No se pudo conectar con Firebase. Verifica la configuración del proyecto y tu conexión a internet.</p>
+      </div>
+      <div class="ph-alert ph-alert-error" style="text-align:left">
+        <i class="bi bi-x-circle"></i>
+        Comprueba que Firebase Auth y Cloud Functions estén habilitados y desplegados.
+      </div>
+      <button class="ph-btn ph-btn-primary ph-btn-block" type="button" (click)="auth.initialize()">
+        <i class="bi bi-arrow-clockwise"></i> Reintentar conexión
+      </button>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     OTP VERIFICATION (2FA)
+══════════════════════════════════════════════════════════════ -->
+@if (authStatus() === 'otp-pending' && otpPending()) {
+  <div class="ph-auth">
+    <div class="ph-auth-card">
+      <div class="ph-auth-logo">
+        <div class="ph-auth-logo__icon"><i class="bi bi-shield-lock"></i></div>
+        <h1>Verificación en dos pasos</h1>
+        <p>Enviamos un código de 6 dígitos a <strong>{{ otpPending()!.email }}</strong></p>
+      </div>
+
+      @if (authError()) {
+        <div class="ph-alert ph-alert-error" role="alert">
+          <i class="bi bi-exclamation-circle"></i> {{ authError() }}
+        </div>
+      }
+
+      <form (ngSubmit)="submitOtp()">
+        <label class="ph-label" style="text-align:center;display:block">Ingresa el código de verificación</label>
+        <div class="ph-otp-inputs">
+          <input
+            type="text"
+            maxlength="6"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="––––––"
+            [ngModel]="otpCode()"
+            (ngModelChange)="otpCode.set($event)"
+            name="otpCode"
+            style="width:180px;text-align:center;letter-spacing:8px"
+            required
+          />
+        </div>
+        <p style="text-align:center;font-size:12.5px;color:var(--ph-secondary);margin:0 0 20px">
+          El código expira en <strong>10 minutos</strong>
+        </p>
+        <button
+          class="ph-btn ph-btn-primary ph-btn-block ph-btn-lg"
+          type="submit"
+          [disabled]="otpBusy() || otpCode().trim().length !== 6"
+        >
+          @if (otpBusy()) { <span class="ph-spinner ph-spinner-white"></span> Verificando… }
+          @else { <i class="bi bi-check-circle"></i> Verificar código }
+        </button>
+      </form>
+
+      <div style="margin-top:20px;text-align:center">
+        <button
+          class="ph-btn ph-btn-ghost ph-btn-sm"
+          type="button"
+          (click)="cancelOtp()"
+          style="color:var(--ph-secondary)"
+        >
+          <i class="bi bi-arrow-left"></i> Volver al inicio de sesión
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     AUTH PAGES (Login / Forgot / Reset)
+══════════════════════════════════════════════════════════════ -->
+@if (authStatus() === 'unauthenticated') {
+  <div class="ph-auth">
+    <div class="ph-auth-card">
+
+      <!-- ── Forgot password ── -->
+      @if (showForgotForm()) {
+        <div class="ph-auth-logo">
+          <div class="ph-auth-logo__icon"><i class="bi bi-lock-fill"></i></div>
+          <h1>Recuperar contraseña</h1>
+          <p>Te enviaremos un enlace para crear una nueva contraseña.</p>
+        </div>
+        @if (authError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ authError() }}</div> }
+        @if (authNotice()) { <div class="ph-alert ph-alert-success"><i class="bi bi-check-circle"></i> {{ authNotice() }}</div> }
+        <form (ngSubmit)="requestReset()">
+          <div class="ph-form-group">
+            <label class="ph-label" for="forgotEmail">Correo electrónico</label>
+            <input
+              id="forgotEmail"
+              class="ph-input"
+              type="email"
+              autocomplete="email"
+              placeholder="tu@colegio.edu.mx"
+              name="forgotEmail"
+              [ngModel]="forgotEmail()"
+              (ngModelChange)="forgotEmail.set($event)"
+              required
+            />
+          </div>
+          <button class="ph-btn ph-btn-primary ph-btn-block ph-btn-lg" type="submit" [disabled]="authBusy()">
+            @if (authBusy()) { <span class="ph-spinner ph-spinner-white"></span> Enviando… }
+            @else { <i class="bi bi-envelope"></i> Enviar enlace de recuperación }
+          </button>
+        </form>
+        <div style="text-align:center;margin-top:20px">
+          <button class="ph-btn ph-btn-ghost ph-btn-sm" type="button" (click)="showForgotForm.set(false); authError.set(''); authNotice.set('')" style="color:var(--ph-secondary)">
+            <i class="bi bi-arrow-left"></i> Volver al inicio de sesión
+          </button>
+        </div>
+
+      <!-- ── Reset password ── -->
+      } @else if (showResetForm()) {
+        <div class="ph-auth-logo">
+          <div class="ph-auth-logo__icon"><i class="bi bi-key-fill"></i></div>
+          <h1>Crear nueva contraseña</h1>
+          <p>Elige una contraseña de al menos 12 caracteres.</p>
+        </div>
+        @if (authError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ authError() }}</div> }
+        @if (!resetToken()) {
+          <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> El enlace no incluye un token válido.</div>
+        }
+        @if (authNotice()) {
+          <div class="ph-alert ph-alert-success"><i class="bi bi-check-circle"></i> {{ authNotice() }}</div>
+          <button class="ph-btn ph-btn-primary ph-btn-block" type="button" (click)="backToLogin()">
+            Ir a iniciar sesión
+          </button>
+        } @else {
+          <form (ngSubmit)="completeReset()">
+            <div class="ph-form-group">
+              <label class="ph-label" for="resetPwd">Nueva contraseña</label>
+              <input
+                id="resetPwd"
+                class="ph-input"
+                type="password"
+                autocomplete="new-password"
+                name="newPassword"
+                minlength="12"
+                maxlength="72"
+                [ngModel]="resetPasswordValue()"
+                (ngModelChange)="resetPasswordValue.set($event)"
+                required
+              />
+            </div>
+            <button
+              class="ph-btn ph-btn-primary ph-btn-block ph-btn-lg"
+              type="submit"
+              [disabled]="authBusy() || !resetToken() || resetPasswordValue().length < 12"
+            >
+              @if (authBusy()) { <span class="ph-spinner ph-spinner-white"></span> Guardando… }
+              @else { <i class="bi bi-shield-check"></i> Actualizar contraseña }
+            </button>
+          </form>
+          <div style="text-align:center;margin-top:20px">
+            <button class="ph-btn ph-btn-ghost ph-btn-sm" type="button" (click)="backToLogin()" style="color:var(--ph-secondary)">
+              <i class="bi bi-arrow-left"></i> Volver al inicio de sesión
+            </button>
+          </div>
+        }
+
+      <!-- ── Login ── -->
+      } @else {
+        <div class="ph-auth-logo">
+          <div class="ph-auth-logo__icon">A</div>
+          <h1>Bienvenido de vuelta</h1>
+          <p>Inicia sesión para acceder al sistema escolar.</p>
+        </div>
+        @if (authError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ authError() }}</div> }
+        @if (authNotice()) { <div class="ph-alert ph-alert-success"><i class="bi bi-check-circle"></i> {{ authNotice() }}</div> }
+        <form (ngSubmit)="submitLogin()">
+          <div class="ph-form-group">
+            <label class="ph-label" for="loginEmail">Correo electrónico</label>
+            <input
+              id="loginEmail"
+              class="ph-input"
+              type="email"
+              autocomplete="username"
+              placeholder="tu@colegio.edu.mx"
+              name="email"
+              [ngModel]="loginEmail()"
+              (ngModelChange)="loginEmail.set($event)"
+              required
+            />
+          </div>
+          <div class="ph-form-group">
+            <label class="ph-label" for="loginPassword">Contraseña</label>
+            <input
+              id="loginPassword"
+              class="ph-input"
+              type="password"
+              autocomplete="current-password"
+              name="password"
+              [ngModel]="loginPassword()"
+              (ngModelChange)="loginPassword.set($event)"
+              required
+            />
+          </div>
+          <button
+            class="ph-btn ph-btn-primary ph-btn-block ph-btn-lg"
+            type="submit"
+            [disabled]="authBusy() || !loginEmail() || !loginPassword()"
+            style="margin-bottom:12px"
+          >
+            @if (authBusy()) { <span class="ph-spinner ph-spinner-white"></span> Iniciando sesión… }
+            @else { <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión }
+          </button>
+        </form>
+        <div style="display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--ph-secondary);font-size:12px">
+          <span style="height:1px;flex:1;background:var(--ph-border)"></span>
+          o continúa con
+          <span style="height:1px;flex:1;background:var(--ph-border)"></span>
+        </div>
+        <button
+          class="ph-btn ph-btn-block"
+          type="button"
+          (click)="submitGoogleLogin()"
+          [disabled]="authBusy()"
+          style="border:1px solid var(--ph-border);background:#fff;color:var(--ph-dark);margin-bottom:12px"
+        >
+          @if (authBusy()) { <span class="ph-spinner"></span> Conectando… }
+          @else { <i class="bi bi-google"></i> Continuar con Google }
+        </button>
+        <div style="text-align:center">
+          <button
+            class="ph-btn ph-btn-ghost ph-btn-sm"
+            type="button"
+            (click)="showForgotForm.set(true); authError.set(''); authNotice.set('')"
+            style="color:var(--ph-secondary)"
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
+        <p style="text-align:center;font-size:12px;color:var(--ph-secondary);margin:20px 0 0">
+          Acceso privado · Las cuentas las administra tu colegio
+        </p>
+      }
+    </div>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════
+     APP LAYOUT (Authenticated)
+══════════════════════════════════════════════════════════════ -->
+@if (authStatus() === 'authenticated') {
+
+  <!-- Sidebar overlay for mobile -->
+  <div
+    class="ph-sidebar-overlay"
+    [class.active]="mobileSidebarOpen()"
+    (click)="closeMobileSidebar()"
+  ></div>
+
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <aside
+    class="ph-sidebar"
+    [class.collapsed]="sidebarCollapsed()"
+    [class.mobile-open]="mobileSidebarOpen()"
+  >
+    <!-- Brand -->
+    <a class="ph-sidebar__brand" href="#" (click)="$event.preventDefault(); setSection('dashboard'); closeMobileSidebar()">
+      <div class="ph-brand-logo">A</div>
+      <div class="ph-sidebar__brand-text">
+        <strong>Aula</strong>
+        <small>Gestión Escolar</small>
+      </div>
+    </a>
+
+    <!-- Nav content -->
+    <div class="ph-sidebar__body">
+      <p class="ph-nav-label">Principal</p>
+
+      @for (item of navItems(); track item.key) {
+        <div class="ph-nav-item">
+          <button
+            type="button"
+            class="ph-nav-link"
+            [class.active]="activeSection() === item.key"
+            [attr.aria-current]="activeSection() === item.key ? 'page' : null"
+            (click)="setSection(item.key); closeMobileSidebar()"
+          >
+            <span class="ph-nav-icon"><i class="bi" [class]="item.icon"></i></span>
+            <span class="ph-nav-text">{{ item.label }}</span>
+          </button>
+        </div>
+      }
+
+      @if (isAdmin() || isTeacher()) {
+        <p class="ph-nav-label" style="margin-top:8px">Comunicaciones</p>
+        <div class="ph-nav-item">
+          <button
+            type="button"
+            class="ph-nav-link"
+            (click)="showMailForm.set(true); closeMobileSidebar()"
+          >
+            <span class="ph-nav-icon"><i class="bi bi-envelope-paper"></i></span>
+            <span class="ph-nav-text">Comunicados</span>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Footer -->
+    <div class="ph-sidebar__footer">
+      <button class="ph-sidebar__footer-btn" type="button" (click)="toggleSidebar()">
+        <i class="bi" [class]="sidebarCollapsed() ? 'bi-layout-sidebar' : 'bi-layout-sidebar-reverse'"></i>
+        <span class="ph-sidebar__footer-text">Vista colapsada</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Topbar ──────────────────────────────────────────────── -->
+  <nav
+    class="ph-topbar"
+    [class.sidebar-collapsed]="sidebarCollapsed()"
+    role="navigation"
+    aria-label="Barra superior"
+  >
+    <!-- Toggle sidebar (desktop) / hamburger (mobile) -->
+    <button class="ph-topbar__toggle" type="button" (click)="toggleSidebar(); toggleMobileSidebar()" aria-label="Alternar menú">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- School name -->
+    <span class="ph-topbar__school">{{ user()?.schoolName }}</span>
+
+    <div class="ph-topbar__spacer"></div>
+
+    <div class="ph-topbar__actions">
+      <!-- Refresh -->
+      <button
+        class="ph-topbar__icon-btn"
+        type="button"
+        [disabled]="loadingData()"
+        (click)="refreshData()"
+        title="Actualizar datos"
+        aria-label="Actualizar datos"
+      >
+        <i class="bi" [class]="loadingData() ? 'bi-arrow-repeat spin' : 'bi-arrow-repeat'"></i>
+      </button>
+
+      <!-- User dropdown -->
+      <div class="dropdown">
+        <button
+          class="ph-topbar__user dropdown-toggle"
+          type="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+          aria-label="Menú de usuario"
+          id="userMenuBtn"
+        >
+          <div class="ph-avatar">{{ initials(user()?.name ?? '') }}</div>
+          <div class="ph-topbar__user-info">
+            <strong>{{ firstName(user()) }}</strong>
+            <small>{{ activeUserLabel(user()) }}</small>
+          </div>
+          <i class="bi bi-chevron-down" style="font-size:11px;color:var(--ph-secondary);margin-left:2px"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="border-radius:12px;min-width:220px;padding:8px 0;margin-top:8px">
+          <li>
+            <div class="px-3 py-2 border-bottom mb-1">
+              <strong style="display:block;font-size:13px;color:var(--ph-dark)">{{ user()?.name }}</strong>
+              <small style="color:var(--ph-secondary);font-size:11px">{{ user()?.email }}</small>
+            </div>
+          </li>
+          <li>
+            <button class="dropdown-item d-flex align-items-center gap-2" type="button" (click)="openChangePassword()">
+              <i class="bi bi-key" style="color:var(--ph-secondary)"></i> Cambiar contraseña
+            </button>
+          </li>
+          @if (!googleLinked()) {
+            <li>
+              <button
+                class="dropdown-item d-flex align-items-center gap-2"
+                type="button"
+                (click)="linkGoogleAccount()"
+                [disabled]="authBusy()"
+              >
+                <i class="bi bi-google" style="color:var(--ph-secondary)"></i> Vincular cuenta de Google
+              </button>
+            </li>
+          }
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <button
+              class="dropdown-item d-flex align-items-center gap-2 text-danger"
+              type="button"
+              (click)="signOut()"
+              [disabled]="authBusy()"
+            >
+              <i class="bi bi-box-arrow-right"></i>
+              {{ authBusy() ? 'Cerrando sesión…' : 'Cerrar sesión' }}
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Main content ────────────────────────────────────────── -->
+  <main class="ph-main" [class.sidebar-collapsed]="sidebarCollapsed()">
+
+    <!-- Global alerts -->
+    @if (apiError()) {
+      <div class="ph-alert ph-alert-error" role="alert" style="margin-bottom:20px">
+        <i class="bi bi-exclamation-circle"></i>
+        {{ apiError() }}
+        <button type="button" (click)="refreshData()" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;font-weight:700;font-size:13px">Reintentar</button>
+      </div>
+    }
+
+    @if (loadingData()) {
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--ph-secondary)">
+        <span class="ph-spinner" style="color:var(--ph-primary)"></span> Actualizando datos…
+      </div>
+    }
+
+    <!-- ════════════════════════════════════════
+         DASHBOARD
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'dashboard') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">{{ todayLabel }} · {{ user()?.schoolName }}</p>
+            <h2 id="page-heading">¡Hola, {{ firstName(user()) }}! <span>✦</span></h2>
+            <p>
+              @if (isParent()) { Aquí está el avance escolar de tus hijos. }
+              @else if (isTeacher()) { Tu panel docente — grupos y calificaciones. }
+              @else { Resumen general del colegio. }
+            </p>
+          </div>
+          <div class="ph-page-header__actions">
+            @if (isAdmin()) {
+              <button class="ph-btn ph-btn-secondary" type="button" (click)="openStudentForm()" [disabled]="!groups().length">
+                <i class="bi bi-person-plus"></i> Nuevo estudiante
+              </button>
+            }
+            @if (canEditGrades()) {
+              <button class="ph-btn ph-btn-primary" type="button" (click)="openBulkForm()" [disabled]="!groups().length || !subjects().length">
+                <i class="bi bi-journal-check"></i> Captura masiva
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (isParent()) {
+          <!-- PARENT DASHBOARD -->
+          @if (dashboardChildren().length === 0) {
+            <div class="ph-card"><div class="ph-card__body"><div class="ph-empty">
+              <i class="bi bi-person-x"></i>
+              <strong>Sin hijos vinculados</strong>
+              <p>Pide al administrador que vincule tu cuenta con el alumno correspondiente.</p>
+            </div></div></div>
+          } @else {
+            <div class="ph-stat-grid">
+              @for (child of dashboardChildren(); track child.id) {
+                <div class="ph-stat-card" style="cursor:pointer;flex-direction:column;align-items:flex-start;gap:8px" (click)="setSection('grades')">
+                  <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+                    <span style="font-size:11px;color:var(--ph-secondary);font-weight:600">{{ child.groupName }} · {{ child.groupGrade }}</span>
+                    <div class="ph-avatar ph-avatar-sm">{{ initials(child.name) }}</div>
+                  </div>
+                  <div class="ph-stat-card__value" style="font-size:16px">{{ child.name }}</div>
+                  <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+                    <span class="ph-stat-card__label">{{ child.gradesCount }} calificaciones</span>
+                    @if (child.average !== null) {
+                      <span class="ph-badge" [class]="gradeColor(child.average)">Prom. {{ child.average }}</span>
+                    } @else {
+                      <span class="ph-stat-card__label">Sin notas aún</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        } @else {
+          <!-- ADMIN / TEACHER DASHBOARD -->
+          <div class="ph-stat-grid">
+            <div class="ph-stat-card">
+              <div class="ph-stat-card__icon icon-primary"><i class="bi bi-person-lines-fill"></i></div>
+              <div>
+                <div class="ph-stat-card__value">{{ dashboard()?.students ?? 0 }}</div>
+                <div class="ph-stat-card__label">Estudiantes</div>
+                <div class="ph-stat-card__sub">{{ dashboard()?.pendingStudents ?? 0 }} pendientes</div>
+              </div>
+            </div>
+            <div class="ph-stat-card">
+              <div class="ph-stat-card__icon icon-success"><i class="bi bi-collection-fill"></i></div>
+              <div>
+                <div class="ph-stat-card__value">{{ dashboard()?.groups ?? 0 }}</div>
+                <div class="ph-stat-card__label">Grupos activos</div>
+                <div class="ph-stat-card__sub">{{ totalGroupStudents() }}/{{ totalGroupCapacity() }} lugares</div>
+              </div>
+            </div>
+            @if (isTeacher()) {
+              <div class="ph-stat-card">
+                <div class="ph-stat-card__icon icon-teal"><i class="bi bi-graph-up"></i></div>
+                <div>
+                  <div class="ph-stat-card__value">
+                    @if (dashboard()?.teacherGradeAvg != null) { {{ dashboard()?.teacherGradeAvg }} } @else { — }
+                  </div>
+                  <div class="ph-stat-card__label">Promedio general</div>
+                  <div class="ph-stat-card__sub">En tus grupos</div>
+                </div>
+              </div>
+            }
+            @if (isAdmin()) {
+              <div class="ph-stat-card">
+                <div class="ph-stat-card__icon icon-warning"><i class="bi bi-clock-fill"></i></div>
+                <div>
+                  <div class="ph-stat-card__value">{{ dashboard()?.pendingStudents ?? 0 }}</div>
+                  <div class="ph-stat-card__label">Inscripciones pendientes</div>
+                </div>
+              </div>
+              <div class="ph-stat-card">
+                <div class="ph-stat-card__icon icon-purple"><i class="bi bi-people-fill"></i></div>
+                <div>
+                  <div class="ph-stat-card__value">{{ dashboard()?.users ?? 0 }}</div>
+                  <div class="ph-stat-card__label">Usuarios activos</div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Charts row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="mt-3">
+            <div class="ph-card">
+              <div class="ph-card__header">
+                <div><h3>Estudiantes por grupo</h3><p>Ocupación actual</p></div>
+                <button type="button" class="ph-btn ph-btn-ghost ph-btn-sm" (click)="setSection('groups')">Ver grupos <i class="bi bi-arrow-right"></i></button>
+              </div>
+              <div class="ph-card__body">
+                @for (group of groups(); track group.id) {
+                  <div style="margin-bottom:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                      <div>
+                        <strong style="font-size:13px;color:var(--ph-dark)">{{ group.name }}</strong>
+                        <span style="font-size:11px;color:var(--ph-secondary);margin-left:6px">{{ group.grade }}</span>
+                      </div>
+                      <span style="font-size:12px;font-weight:700;color:var(--ph-dark)">{{ group.students }}<small style="color:var(--ph-secondary);font-weight:400">/{{ group.capacity }}</small></span>
+                    </div>
+                    <div class="ph-group-bar">
+                      <span [style.width.%]="chartOccupancy(group)"></span>
+                    </div>
+                  </div>
+                } @empty {
+                  <div class="ph-empty"><p>No hay grupos registrados.</p></div>
+                }
+              </div>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card__header"><div><h3>Accesos rápidos</h3><p>Atajos para tus tareas diarias</p></div></div>
+              <div class="ph-card__body" style="display:flex;flex-direction:column;gap:8px">
+                @if (isAdmin()) {
+                  <button type="button" class="ph-btn ph-btn-secondary" style="justify-content:flex-start;text-align:left" (click)="openStudentForm()" [disabled]="!groups().length">
+                    <i class="bi bi-person-plus" style="color:var(--ph-primary)"></i>
+                    <div><strong style="display:block">Registrar estudiante</strong><small style="color:var(--ph-secondary)">Agregar al directorio</small></div>
+                  </button>
+                }
+                @if (canEditGrades()) {
+                  <button type="button" class="ph-btn ph-btn-secondary" style="justify-content:flex-start;text-align:left" (click)="openBulkForm()" [disabled]="!groups().length || !subjects().length">
+                    <i class="bi bi-journal-check" style="color:#27bcfd"></i>
+                    <div><strong style="display:block">Captura masiva de notas</strong><small style="color:var(--ph-secondary)">Todo un grupo en un paso</small></div>
+                  </button>
+                  <button type="button" class="ph-btn ph-btn-secondary" style="justify-content:flex-start;text-align:left" (click)="setSection('reports')">
+                    <i class="bi bi-file-earmark-text" style="color:var(--ph-warning)"></i>
+                    <div><strong style="display:block">Crear reporte</strong><small style="color:var(--ph-secondary)">Comunicado para padres</small></div>
+                  </button>
+                }
+                @if (isAdmin()) {
+                  <button type="button" class="ph-btn ph-btn-secondary" style="justify-content:flex-start;text-align:left" (click)="setSection('users')">
+                    <i class="bi bi-people" style="color:var(--ph-primary)"></i>
+                    <div><strong style="display:block">Gestionar usuarios</strong><small style="color:var(--ph-secondary)">Docentes y padres</small></div>
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         STUDENTS
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'students') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Directorio escolar</p>
+            <h2 id="page-heading">Estudiantes</h2>
+            <p>Administra la información y el estado de inscripción.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            @if (isAdmin()) {
+              <button class="ph-btn ph-btn-primary" type="button" (click)="openStudentForm()" [disabled]="!groups().length">
+                <i class="bi bi-plus-lg"></i> Nuevo estudiante
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Summary badges -->
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+          <span class="ph-badge ph-badge-neutral"><i class="bi bi-people"></i> {{ students().length }} registros</span>
+          <span class="ph-badge ph-badge-success">{{ enrolledCount() }} inscritos</span>
+          <span class="ph-badge ph-badge-warning">{{ pendingCount() }} pendientes</span>
+        </div>
+
+        <div class="ph-card">
+          <div class="ph-card__header">
+            <div><h3>Todos los estudiantes</h3><p>Busca por nombre, matrícula, grado o tutor.</p></div>
+            <div class="ph-search" style="max-width:220px">
+              <i class="bi bi-search"></i>
+              <input
+                class="ph-input"
+                type="search"
+                placeholder="Buscar..."
+                [ngModel]="searchTerm()"
+                (ngModelChange)="searchTerm.set($event)"
+                aria-label="Buscar estudiantes"
+              />
+            </div>
+          </div>
+          <div class="ph-table-wrap">
+            <table class="ph-table">
+              <thead>
+                <tr>
+                  <th>Estudiante</th><th>Matrícula</th><th>Grado · Grupo</th><th>Tutor</th><th>Estado</th>
+                  @if (isAdmin()) { <th>Acciones</th> }
+                </tr>
+              </thead>
+              <tbody>
+                @for (student of filteredStudents(); track student.id) {
+                  <tr>
+                    <td>
+                      <div class="ph-person-cell">
+                        <div class="ph-avatar ph-avatar-sm">{{ initials(student.name) }}</div>
+                        <strong>{{ student.name }}</strong>
+                      </div>
+                    </td>
+                    <td style="color:var(--ph-secondary)">{{ student.registrationNumber }}</td>
+                    <td>{{ student.grade }} · {{ student.group }}</td>
+                    <td>{{ student.guardian }}</td>
+                    <td>
+                      <span class="ph-badge" [class]="student.status === 'ENROLLED' ? 'ph-badge-success' : 'ph-badge-warning'">
+                        {{ studentStatusLabel(student.status) }}
+                      </span>
+                    </td>
+                    @if (isAdmin()) {
+                      <td>
+                        <div style="display:flex;gap:6px">
+                          <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="openStudentForm(student)">Editar</button>
+                          <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteStudent(student)">Eliminar</button>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr><td [attr.colspan]="isAdmin() ? 6 : 5">
+                    <div class="ph-empty"><i class="bi bi-search"></i><p>No encontramos estudiantes con esa búsqueda.</p></div>
+                  </td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="ph-table-footer">Mostrando {{ filteredStudents().length }} de {{ students().length }} estudiantes</div>
+        </div>
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         GROUPS
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'groups') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Organización académica</p>
+            <h2 id="page-heading">Grupos</h2>
+            <p>Consulta docentes, aulas y capacidad de cada grupo.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            @if (isAdmin()) {
+              <button class="ph-btn ph-btn-primary" type="button" (click)="openGroupForm()">
+                <i class="bi bi-plus-lg"></i> Nuevo grupo
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="ph-stat-grid" style="margin-bottom:20px">
+          <div class="ph-stat-card">
+            <div class="ph-stat-card__icon icon-primary"><i class="bi bi-collection-fill"></i></div>
+            <div><div class="ph-stat-card__value">{{ groups().length }}</div><div class="ph-stat-card__label">Grupos activos</div></div>
+          </div>
+          <div class="ph-stat-card">
+            <div class="ph-stat-card__icon icon-success"><i class="bi bi-person-fill"></i></div>
+            <div><div class="ph-stat-card__value">{{ totalGroupStudents() }}</div><div class="ph-stat-card__label">Lugares ocupados</div></div>
+          </div>
+          <div class="ph-stat-card">
+            <div class="ph-stat-card__icon icon-teal"><i class="bi bi-door-open-fill"></i></div>
+            <div><div class="ph-stat-card__value">{{ totalGroupCapacity() - totalGroupStudents() }}</div><div class="ph-stat-card__label">Lugares disponibles</div></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+          @for (group of groups(); track group.id) {
+            <div class="ph-card">
+              <div class="ph-card__body">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                  <div style="width:40px;height:40px;background:var(--ph-primary-light);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--ph-primary);font-size:18px">
+                    <i class="bi bi-collection"></i>
+                  </div>
+                  <span class="ph-badge ph-badge-success"><i class="bi bi-circle-fill" style="font-size:7px"></i> Activo</span>
+                </div>
+                <h3 style="margin:0 0 2px;font-size:17px;font-weight:800">{{ group.name }}</h3>
+                <p style="margin:0 0 12px;font-size:12px;color:var(--ph-secondary)">{{ group.grade }}</p>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                  <div class="ph-avatar ph-avatar-sm">{{ teacherInitials(group.teacher) }}</div>
+                  <div>
+                    <small style="font-size:9px;color:var(--ph-secondary);text-transform:uppercase;font-weight:700">Docente titular</small>
+                    <strong style="display:block;font-size:12px">{{ group.teacher ?? 'Sin asignar' }}</strong>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+                  <span style="font-size:12px;color:var(--ph-secondary)">Ocupación</span>
+                  <strong style="font-size:13px">{{ group.students }} <small style="color:var(--ph-secondary);font-weight:400">/ {{ group.capacity }}</small></strong>
+                </div>
+                <div class="ph-group-bar">
+                  <span [style.width.%]="chartOccupancy(group)"></span>
+                </div>
+                <p style="font-size:11px;color:var(--ph-secondary);margin:6px 0 12px"><i class="bi bi-door-open"></i> {{ group.room }} · {{ chartOccupancy(group).toFixed(0) }}% ocupado</p>
+                @if (isAdmin()) {
+                  <div style="display:flex;gap:8px">
+                    <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="openGroupForm(group)" style="flex:1">Editar</button>
+                    <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteGroup(group)"><i class="bi bi-trash"></i></button>
+                  </div>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="ph-card" style="grid-column:1/-1"><div class="ph-card__body"><div class="ph-empty">
+              <i class="bi bi-collection-fill"></i>
+              <strong>Sin grupos registrados</strong>
+              <p>Crea el primer grupo para comenzar.</p>
+            </div></div></div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         USERS
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'users' && isAdmin()) {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Acceso al sistema</p>
+            <h2 id="page-heading">Usuarios</h2>
+            <p>Administra el personal con acceso a la plataforma.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            <button class="ph-btn ph-btn-primary" type="button" (click)="openUserForm()">
+              <i class="bi bi-person-plus"></i> Crear usuario
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+          <span class="ph-badge ph-badge-neutral">{{ users().length }} registrados</span>
+          <span class="ph-badge ph-badge-success">{{ activeUserCount() }} activos</span>
+        </div>
+
+        <div class="ph-card">
+          <div class="ph-card__header"><div><h3>Equipo escolar</h3><p>Las cuentas las crea la administración.</p></div></div>
+          <div class="ph-table-wrap">
+            <table class="ph-table">
+              <thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody>
+                @for (schoolUser of users(); track schoolUser.id) {
+                  <tr>
+                    <td>
+                      <div class="ph-person-cell">
+                        <div class="ph-avatar ph-avatar-sm">{{ initials(schoolUser.name) }}</div>
+                        <strong>{{ schoolUser.name }}</strong>
+                      </div>
+                    </td>
+                    <td style="color:var(--ph-secondary)">{{ schoolUser.email }}</td>
+                    <td>
+                      <span class="ph-role-tag" [class]="'ph-role-tag-' + schoolUser.role.toLowerCase()">
+                        {{ userRoleLabel(schoolUser.role) }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="ph-badge" [class]="schoolUser.active ? 'ph-badge-success' : 'ph-badge-neutral'">
+                        {{ schoolUser.active ? 'Activo' : 'Desactivado' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="display:flex;gap:6px">
+                        <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="toggleUser(schoolUser)">
+                          {{ schoolUser.active ? 'Desactivar' : 'Activar' }}
+                        </button>
+                        <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteUser(schoolUser)">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="5"><div class="ph-empty"><i class="bi bi-people"></i><p>Aún no hay usuarios registrados.</p></div></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="ph-table-footer">Al desactivar una cuenta, sus sesiones se cierran inmediatamente.</div>
+        </div>
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         GRADES
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'grades') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Control académico</p>
+            <h2 id="page-heading">Calificaciones</h2>
+            <p>
+              @if (isParent()) { Consulta el avance escolar de tus hijos. }
+              @else { Registra y consulta las calificaciones por alumno y periodo. }
+            </p>
+          </div>
+          <div class="ph-page-header__actions">
+            @if (canEditGrades()) {
+              @if (isAdmin()) {
+                <button class="ph-btn ph-btn-secondary" type="button" (click)="openSubjectForm()">
+                  <i class="bi bi-book"></i> Nueva materia
+                </button>
+              }
+              <button class="ph-btn ph-btn-primary" type="button" (click)="openGradeForm()" [disabled]="!subjects().length || !students().length">
+                <i class="bi bi-plus-lg"></i> Registrar calificación
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (isAdmin() && subjects().length) {
+          <div class="ph-card" style="margin-bottom:16px">
+            <div class="ph-card__body" style="padding:14px 20px">
+              <strong style="font-size:11px;color:var(--ph-secondary);text-transform:uppercase;letter-spacing:.05em">Materias registradas</strong>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                @for (subject of subjects(); track subject.id) {
+                  <span style="display:inline-flex;align-items:center;gap:6px;background:var(--ph-light);border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600">
+                    {{ subject.name }}
+                    <button type="button" (click)="deleteSubject(subject)" style="background:none;border:none;color:var(--ph-secondary);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button>
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (canEditGrades()) {
+          <div class="ph-filter-bar">
+            <label>
+              <i class="bi bi-collection"></i>
+              <select class="ph-select" [ngModel]="gradeFilterGroupId()" (ngModelChange)="gradeFilterGroupId.set($event); loadGrades()">
+                <option value="">Todos los grupos</option>
+                @for (group of groups(); track group.id) {
+                  <option [value]="group.id">{{ group.name }} · {{ group.grade }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <i class="bi bi-calendar3"></i>
+              <select class="ph-select" [ngModel]="gradeFilterPeriod()" (ngModelChange)="gradeFilterPeriod.set($event); loadGrades()">
+                <option value="">Todos los periodos</option>
+                <option value="Q1">1er Bimestre</option>
+                <option value="Q2">2do Bimestre</option>
+                <option value="Q3">3er Bimestre</option>
+                <option value="Q4">4to Bimestre</option>
+                <option value="FINAL">Final</option>
+              </select>
+            </label>
+          </div>
+        }
+
+        @if (isParent()) {
+          @for (child of dashboardChildren(); track child.id) {
+            <div class="ph-card" style="margin-bottom:16px">
+              <div class="ph-card__header">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div class="ph-avatar">{{ initials(child.name) }}</div>
+                  <div>
+                    <strong style="font-size:13px">{{ child.name }}</strong>
+                    <div style="font-size:11px;color:var(--ph-secondary)">{{ child.groupName }} · {{ child.registrationNumber }}</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  @if (child.average !== null) {
+                    <span class="ph-badge" [class]="gradeColor(child.average)">Prom. {{ child.average }}</span>
+                  }
+                  <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="downloadBoleta(child)">
+                    <i class="bi bi-file-earmark-pdf"></i> Boleta PDF
+                  </button>
+                  <button
+                    class="ph-btn ph-btn-secondary ph-btn-sm"
+                    type="button"
+                    [disabled]="boletaEmailBusyStudentId() === child.id || child.gradesCount === 0"
+                    (click)="emailBoleta(child)"
+                  >
+                    @if (boletaEmailBusyStudentId() === child.id) {
+                      <span class="ph-spinner"></span> Enviando…
+                    } @else {
+                      <i class="bi bi-envelope"></i> Enviar boleta
+                    }
+                  </button>
+                </div>
+              </div>
+              <div class="ph-table-wrap">
+                <table class="ph-table">
+                  <thead>
+                    <tr>
+                      <th>Materia</th><th>1er Bim</th><th>2do Bim</th><th>3er Bim</th><th>4to Bim</th><th>Final</th><th>Promedio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (subject of subjects(); track subject.id) {
+                      @let subjectGrades = grades().filter(g => g.studentId === child.id && g.subjectId === subject.id);
+                      @let subjectAvg = subjectGrades.length ? (subjectGrades.reduce((a,g)=>a+g.value,0)/subjectGrades.length) : null;
+                      <tr>
+                        <td><strong>{{ subject.name }}</strong></td>
+                        @for (period of ['Q1','Q2','Q3','Q4','FINAL']; track period) {
+                          @let g = subjectGrades.find(x => x.period === period);
+                          <td>
+                            @if (g) {
+                              <span class="ph-badge" [class]="gradeColor(g.value)">{{ g.value }}</span>
+                            } @else { <span style="color:#c5c7d4">—</span> }
+                          </td>
+                        }
+                        <td>
+                          @if (subjectAvg !== null) {
+                            <span class="ph-badge" [class]="gradeColor(subjectAvg)" style="font-weight:800">{{ (subjectAvg | number:'1.1-1') }}</span>
+                          } @else { <span style="color:#c5c7d4">—</span> }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr><td colspan="7"><div class="ph-empty"><p>No hay materias registradas.</p></div></td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          } @empty {
+            <div class="ph-card"><div class="ph-card__body"><div class="ph-empty">
+              <i class="bi bi-person-x"></i>
+              <p>No tienes hijos vinculados. Contacta al administrador.</p>
+            </div></div></div>
+          }
+        } @else {
+          <div class="ph-card">
+            <div class="ph-card__header"><div><h3>Listado de calificaciones</h3><p>{{ grades().length }} registros encontrados</p></div></div>
+            <div class="ph-table-wrap">
+              <table class="ph-table">
+                <thead>
+                  <tr>
+                    <th>Alumno</th><th>Materia</th><th>Periodo</th><th>Calificación</th><th>Notas</th>
+                    @if (!isParent()) { <th>Docente</th> }
+                    @if (canEditGrades()) { <th>Acciones</th> }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (grade of grades(); track grade.id) {
+                    <tr>
+                      <td>
+                        <div class="ph-person-cell">
+                          <div class="ph-avatar ph-avatar-sm">{{ initials(grade.studentName) }}</div>
+                          <strong>{{ grade.studentName }}</strong>
+                        </div>
+                      </td>
+                      <td>{{ grade.subjectName }}</td>
+                      <td>{{ periodLabel(grade.period) }}</td>
+                      <td><span class="ph-badge" [class]="gradeColor(grade.value)">{{ grade.value }}</span></td>
+                      <td style="color:var(--ph-secondary)">{{ grade.notes ?? '—' }}</td>
+                      @if (!isParent()) { <td style="color:var(--ph-secondary)">{{ grade.teacherName }}</td> }
+                      @if (canEditGrades()) {
+                        <td>
+                          <div style="display:flex;gap:6px">
+                            <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="openGradeForm(grade)">Editar</button>
+                            <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteGrade(grade)"><i class="bi bi-trash"></i></button>
+                          </div>
+                        </td>
+                      }
+                    </tr>
+                  } @empty {
+                    <tr><td [attr.colspan]="canEditGrades() ? 7 : 5">
+                      <div class="ph-empty"><i class="bi bi-journal-x"></i><p>No hay calificaciones registradas aún.</p></div>
+                    </td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         REPORTS
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'reports') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Comunicación escolar</p>
+            <h2 id="page-heading">Reportes</h2>
+            <p>
+              @if (isParent()) { Comunicados y observaciones del maestro sobre tu grupo. }
+              @else { Registra observaciones y reportes de grupo o alumnos. }
+            </p>
+          </div>
+          @if (canEditGrades()) {
+            <div class="ph-page-header__actions">
+              <button class="ph-btn ph-btn-primary" type="button" (click)="openReportForm()">
+                <i class="bi bi-plus-lg"></i> Nuevo reporte
+              </button>
+            </div>
+          }
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          @for (report of reports(); track report.id) {
+            <div class="ph-card">
+              <div class="ph-card__body">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
+                  <div>
+                    <strong style="font-size:14px;color:var(--ph-dark)">{{ report.title }}</strong>
+                    <div style="display:flex;gap:12px;margin-top:4px;font-size:12px;color:var(--ph-secondary);flex-wrap:wrap">
+                      <span><i class="bi bi-person"></i> {{ report.teacherName }}</span>
+                      @if (report.groupName) { <span><i class="bi bi-collection"></i> {{ report.groupName }} ({{ report.groupGrade }})</span> }
+                      <span><i class="bi bi-calendar3"></i> {{ formatDate(report.createdAt) }}</span>
+                    </div>
+                  </div>
+                  @if (canEditGrades()) {
+                    <div style="display:flex;gap:6px;flex-shrink:0">
+                      <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="openReportForm(report)">Editar</button>
+                      <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteReport(report)"><i class="bi bi-trash"></i></button>
+                    </div>
+                  }
+                </div>
+                <p style="margin:0;font-size:13.5px;color:var(--ph-body-color);white-space:pre-line">{{ report.body }}</p>
+              </div>
+            </div>
+          } @empty {
+            <div class="ph-card"><div class="ph-card__body"><div class="ph-empty">
+              <i class="bi bi-file-earmark-text"></i>
+              <strong>Sin reportes</strong>
+              <p>No hay reportes registrados aún.</p>
+            </div></div></div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         ATTENDANCE
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'attendance') {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Control de asistencia</p>
+            <h2 id="page-heading">Asistencias</h2>
+            <p>Registra la asistencia diaria por grupo y consulta el resumen del ciclo.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            <button class="ph-btn ph-btn-secondary" type="button" (click)="showAttendanceSummary.set(!showAttendanceSummary())">
+              <i class="bi" [class]="showAttendanceSummary() ? 'bi-calendar-check' : 'bi-bar-chart'"></i>
+              {{ showAttendanceSummary() ? 'Ver captura' : 'Ver resumen' }}
+            </button>
+            <button class="ph-btn ph-btn-primary" type="button" (click)="saveAttendance()" [disabled]="attendanceBusy() || !attendanceCycleId()">
+              <i class="bi bi-check2-all"></i>
+              {{ attendanceBusy() ? 'Guardando…' : 'Guardar asistencia' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="ph-filter-bar">
+          <label>
+            <i class="bi bi-calendar3"></i>
+            <select class="ph-select" [ngModel]="attendanceCycleId()" (ngModelChange)="attendanceCycleId.set($event); loadAttendance()">
+              <option value="">Selecciona un ciclo</option>
+              @for (c of cycles(); track c.id) { <option [value]="c.id">{{ c.name }}{{ c.active ? ' ★' : '' }}</option> }
+            </select>
+          </label>
+          <label>
+            <i class="bi bi-collection"></i>
+            <select class="ph-select" [ngModel]="attendanceGroupId()" (ngModelChange)="attendanceGroupId.set($event); loadAttendance()">
+              <option value="">Todos los grupos</option>
+              @for (g of groups(); track g.id) { <option [value]="g.id">{{ g.name }} · {{ g.grade }}</option> }
+            </select>
+          </label>
+          <label>
+            <i class="bi bi-calendar-day"></i>
+            <input class="ph-input" type="date" [ngModel]="attendanceDate()" (ngModelChange)="attendanceDate.set($event); loadAttendance()" style="width:auto;min-width:150px" />
+          </label>
+        </div>
+
+        @if (!cycles().length) {
+          <div class="ph-card"><div class="ph-card__body"><div class="ph-empty">
+            <i class="bi bi-calendar-x"></i>
+            <strong>Sin ciclos escolares</strong>
+            <p>Crea un ciclo escolar antes de registrar asistencias. <button class="ph-btn ph-btn-ghost ph-btn-sm" type="button" (click)="setSection('cycles')">Crear ciclo →</button></p>
+          </div></div></div>
+        } @else if (!showAttendanceSummary()) {
+          <div class="ph-card">
+            <div class="ph-card__header"><div><h3>Captura del día</h3><p>Marca el estado de cada alumno para la fecha seleccionada.</p></div></div>
+            <div class="ph-table-wrap">
+              <table class="ph-table">
+                <thead><tr><th>Alumno</th><th>Matrícula</th><th>Grupo</th><th>Asistencia</th></tr></thead>
+                <tbody>
+                  @let dayStudents = attendanceGroupId() ? students().filter(s => s.groupId === attendanceGroupId()) : students();
+                  @for (s of dayStudents; track s.id) {
+                    <tr>
+                      <td>
+                        <div class="ph-person-cell">
+                          <div class="ph-avatar ph-avatar-sm">{{ initials(s.name) }}</div>
+                          <strong>{{ s.name }}</strong>
+                        </div>
+                      </td>
+                      <td style="color:var(--ph-secondary)">{{ s.registrationNumber }}</td>
+                      <td>{{ s.group }}</td>
+                      <td>
+                        <div style="display:flex;gap:5px;flex-wrap:wrap">
+                          @for (st of ['PRESENT','ABSENT','LATE','JUSTIFIED']; track st) {
+                            <button
+                              type="button"
+                              class="ph-btn ph-btn-sm"
+                              [class.ph-btn-primary]="getAttendanceDraft(s.id) === st && st === 'PRESENT'"
+                              [class.ph-btn-danger]="getAttendanceDraft(s.id) === st && st === 'ABSENT'"
+                              [class.ph-btn-secondary]="getAttendanceDraft(s.id) !== st"
+                              [style.background]="getAttendanceDraft(s.id) === st && st === 'LATE' ? '#f5803e' : getAttendanceDraft(s.id) === st && st === 'JUSTIFIED' ? '#2A7BE4' : ''"
+                              [style.color]="(getAttendanceDraft(s.id) === st && (st === 'LATE' || st === 'JUSTIFIED')) ? '#fff' : ''"
+                              (click)="setAttendanceDraft(s.id, st)"
+                            >{{ attendanceStatusLabel(st) }}</button>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="4"><div class="ph-empty"><p>Selecciona un grupo o verifica que haya alumnos registrados.</p></div></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @else {
+          <div class="ph-card">
+            <div class="ph-card__header"><div><h3>Resumen del ciclo</h3><p>Totales de asistencia por alumno en el ciclo seleccionado.</p></div></div>
+            <div class="ph-table-wrap">
+              <table class="ph-table">
+                <thead><tr><th>Alumno</th><th>Presentes</th><th>Faltas</th><th>Retardos</th><th>Justificadas</th><th>% Asistencia</th></tr></thead>
+                <tbody>
+                  @for (s of attendanceSummary(); track s.studentId) {
+                    <tr>
+                      <td>
+                        <div class="ph-person-cell">
+                          <div class="ph-avatar ph-avatar-sm">{{ initials(s.studentName) }}</div>
+                          <strong>{{ s.studentName }}</strong>
+                        </div>
+                      </td>
+                      <td><span class="ph-badge ph-badge-success">{{ s.present }}</span></td>
+                      <td><span class="ph-badge ph-badge-danger">{{ s.absent }}</span></td>
+                      <td><span class="ph-badge ph-badge-warning">{{ s.late }}</span></td>
+                      <td><span class="ph-badge ph-badge-primary">{{ s.justified }}</span></td>
+                      <td>
+                        @if (s.attendanceRate !== null) {
+                          <span class="ph-badge" [class]="s.attendanceRate >= 85 ? 'ph-badge-success' : s.attendanceRate >= 70 ? 'ph-badge-warning' : 'ph-badge-danger'">
+                            {{ s.attendanceRate }}%
+                          </span>
+                        } @else { <span style="color:#c5c7d4">—</span> }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="6"><div class="ph-empty"><p>Sin registros para este ciclo.</p></div></td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         CYCLES
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'cycles' && isAdmin()) {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Administración académica</p>
+            <h2 id="page-heading">Ciclos escolares</h2>
+            <p>Define los periodos del año escolar. Solo un ciclo puede estar activo a la vez.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            <button class="ph-btn ph-btn-primary" type="button" (click)="openCycleForm()">
+              <i class="bi bi-plus-lg"></i> Nuevo ciclo
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+          @for (cycle of cycles(); track cycle.id) {
+            <div class="ph-card">
+              <div class="ph-card__body">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <span class="ph-badge" [class]="cycle.active ? 'ph-badge-success' : 'ph-badge-neutral'">
+                    <i class="bi" [class]="cycle.active ? 'bi-circle-fill' : 'bi-circle'" style="font-size:7px"></i>
+                    {{ cycle.active ? 'Activo' : 'Inactivo' }}
+                  </span>
+                  <div style="display:flex;gap:6px">
+                    @if (!cycle.active) {
+                      <button class="ph-btn ph-btn-ghost ph-btn-sm" type="button" (click)="setActiveCycle(cycle)">Activar</button>
+                    }
+                    <button class="ph-btn ph-btn-secondary ph-btn-sm" type="button" (click)="openCycleForm(cycle)"><i class="bi bi-pencil"></i></button>
+                    <button class="ph-btn ph-btn-danger ph-btn-sm" type="button" (click)="deleteCycle(cycle)"><i class="bi bi-trash"></i></button>
+                  </div>
+                </div>
+                <strong style="font-size:18px;font-weight:800;color:var(--ph-dark)">{{ cycle.name }}</strong>
+                <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ph-secondary)">
+                  <span><i class="bi bi-calendar-event"></i> {{ formatCycleDate(cycle.startDate) }}</span>
+                  <span><i class="bi bi-calendar-check"></i> {{ formatCycleDate(cycle.endDate) }}</span>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <div class="ph-card" style="grid-column:1/-1"><div class="ph-card__body"><div class="ph-empty">
+              <i class="bi bi-calendar-x"></i>
+              <strong>Sin ciclos</strong>
+              <p>Crea el primer ciclo escolar.</p>
+            </div></div></div>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ════════════════════════════════════════
+         CONFIG
+    ════════════════════════════════════════ -->
+    @if (activeSection() === 'config' && isAdmin()) {
+      <section class="ph-section" aria-labelledby="page-heading">
+        <div class="ph-page-header">
+          <div class="ph-page-header__title">
+            <p class="ph-page-header__eyebrow">Ajustes del sistema</p>
+            <h2 id="page-heading">Configuración</h2>
+            <p>Datos generales del colegio y parámetros académicos.</p>
+          </div>
+          <div class="ph-page-header__actions">
+            <button class="ph-btn ph-btn-primary" type="button" (click)="saveConfig()" [disabled]="configBusy()">
+              <i class="bi bi-floppy"></i>
+              {{ configBusy() ? 'Guardando…' : 'Guardar cambios' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="ph-card" style="max-width:600px">
+          <div class="ph-card__body">
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Nivel educativo</label>
+                <select class="ph-select" [ngModel]="configLevelType()" (ngModelChange)="configLevelType.set($event)">
+                  <option value="PRIMARY">Primaria</option>
+                  <option value="SECONDARY">Secundaria</option>
+                  <option value="BACHILLERATO">Bachillerato</option>
+                </select>
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Escala de calificaciones</label>
+                <select class="ph-select" [ngModel]="configGradingScale()" (ngModelChange)="configGradingScale.set(+$event)">
+                  <option [value]="10">0 – 10</option>
+                  <option [value]="100">0 – 100</option>
+                </select>
+              </div>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre del director(a)</label>
+              <input class="ph-input" [ngModel]="configDirector()" (ngModelChange)="configDirector.set($event)" placeholder="Ej. Lic. María López" maxlength="120" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Dirección del plantel</label>
+              <input class="ph-input" [ngModel]="configAddress()" (ngModelChange)="configAddress.set($event)" placeholder="Calle, número, colonia, ciudad" maxlength="200" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Teléfono</label>
+              <input class="ph-input" [ngModel]="configPhone()" (ngModelChange)="configPhone.set($event)" placeholder="55 1234 5678" maxlength="60" />
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- Footer -->
+    <footer style="margin-top:40px;padding-top:16px;border-top:1px solid var(--ph-border);display:flex;justify-content:space-between;font-size:12px;color:var(--ph-secondary)">
+      <span>© 2026 Aula · Sistema de gestión escolar</span>
+      <span>Phoenix Admin UI · Firebase Hosting</span>
+    </footer>
+  </main>
+
+  <!-- ════════════════════════════════════════
+       TOAST CONTAINER
+  ════════════════════════════════════════ -->
+  <div class="ph-toast-container" aria-live="polite" aria-atomic="false">
+    @for (t of toast.toasts(); track t.id) {
+      <div class="ph-toast" [class]="'ph-toast-' + t.type" role="alert">
+        <span class="ph-toast__icon">
+          @if (t.type === 'success') { <i class="bi bi-check-circle-fill" style="color:#27bcfd"></i> }
+          @if (t.type === 'error')   { <i class="bi bi-x-circle-fill" style="color:var(--ph-danger)"></i> }
+          @if (t.type === 'info')    { <i class="bi bi-info-circle-fill" style="color:var(--ph-primary)"></i> }
+          @if (t.type === 'warning') { <i class="bi bi-exclamation-triangle-fill" style="color:var(--ph-warning)"></i> }
+        </span>
+        <span class="ph-toast__message">{{ t.message }}</span>
+        <button class="ph-toast__close" type="button" (click)="toast.dismiss(t.id)" aria-label="Cerrar">×</button>
+      </div>
+    }
+  </div>
+
+  <!-- ════════════════════════════════════════
+       CONFIRM DIALOG
+  ════════════════════════════════════════ -->
+  @if (confirm.visible()) {
+    <div class="ph-modal-backdrop" (click)="confirm.cancel()" (keydown.escape)="confirm.cancel()">
+      <div class="ph-modal ph-modal-sm" role="alertdialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-card__body" style="text-align:center;padding:28px 24px">
+          <div style="width:52px;height:52px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px"
+               [style.background]="confirm.options().danger ? 'rgba(230,55,87,.1)' : 'rgba(42,123,228,.1)'"
+               [style.color]="confirm.options().danger ? 'var(--ph-danger)' : 'var(--ph-primary)'">
+            <i class="bi" [class]="confirm.options().danger ? 'bi-exclamation-triangle-fill' : 'bi-question-circle-fill'"></i>
+          </div>
+          <h3 style="margin:0 0 8px;font-size:16px;font-weight:800;color:var(--ph-dark)">{{ confirm.options().title }}</h3>
+          <p style="margin:0 0 24px;color:var(--ph-secondary);font-size:13.5px">{{ confirm.options().message }}</p>
+          <div style="display:flex;gap:10px;justify-content:center">
+            <button class="ph-btn ph-btn-secondary" type="button" (click)="confirm.cancel()">Cancelar</button>
+            <button
+              class="ph-btn"
+              [class.ph-btn-danger]="confirm.options().danger"
+              [class.ph-btn-primary]="!confirm.options().danger"
+              type="button"
+              (click)="confirm.confirm()"
+            >
+              {{ confirm.options().confirmLabel ?? 'Confirmar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ════════════════════════════════════════
+       STUDENT FORM MODAL
+  ════════════════════════════════════════ -->
+  @if (showStudentForm()) {
+    <div class="ph-modal-backdrop" (click)="showStudentForm.set(false)" (keydown.escape)="showStudentForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" aria-labelledby="student-form-heading" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div>
+            <h2 id="student-form-heading">{{ editingStudentId() ? 'Editar estudiante' : 'Nuevo estudiante' }}</h2>
+            <p>Los cambios se guardan en la base de datos del colegio.</p>
+          </div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showStudentForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="student-form" (ngSubmit)="submitStudent()">
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre completo</label>
+              <input class="ph-input" name="studentName" [ngModel]="studentName()" (ngModelChange)="studentName.set($event)" placeholder="Ej. Daniela García" required minlength="2" maxlength="120" />
+            </div>
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Grado</label>
+                <input class="ph-input" [value]="selectedStudentGrade()" disabled />
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Grupo</label>
+                <select class="ph-select" name="studentGroup" [ngModel]="studentGroupId()" (ngModelChange)="studentGroupId.set($event)" required>
+                  @for (group of groups(); track group.id) { <option [value]="group.id">{{ group.name }} · {{ group.grade }}</option> }
+                </select>
+              </div>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre del tutor</label>
+              <input class="ph-input" name="studentGuardian" [ngModel]="studentGuardian()" (ngModelChange)="studentGuardian.set($event)" placeholder="Ej. Mariana García" required minlength="2" maxlength="120" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Estado de inscripción</label>
+              <select class="ph-select" name="studentStatus" [ngModel]="studentStatus()" (ngModelChange)="studentStatus.set($event)">
+                <option value="ENROLLED">Inscrito</option>
+                <option value="PENDING">Pendiente</option>
+              </select>
+            </div>
+            @if (isAdmin()) {
+              <div class="ph-form-group">
+                <label class="ph-label">Padre / Tutor vinculado (opcional)</label>
+                <select class="ph-select" name="studentParentId" [ngModel]="studentParentId()" (ngModelChange)="studentParentId.set($event)">
+                  <option value="">Sin vincular</option>
+                  @for (pu of parentUsers(); track pu.id) {
+                    <option [value]="pu.id">{{ pu.name }} ({{ pu.email }})</option>
+                  }
+                </select>
+              </div>
+            }
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showStudentForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="student-form" [disabled]="mutationBusy() || !studentName().trim() || !studentGuardian().trim() || !studentGroupId()">
+            {{ mutationBusy() ? 'Guardando…' : 'Guardar estudiante' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- GROUP FORM MODAL -->
+  @if (showGroupForm()) {
+    <div class="ph-modal-backdrop" (click)="showGroupForm.set(false)" (keydown.escape)="showGroupForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" aria-labelledby="group-form-heading" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2 id="group-form-heading">{{ editingGroupId() ? 'Editar grupo' : 'Nuevo grupo' }}</h2><p>Define el grado, aula, capacidad y docente titular.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showGroupForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="group-form" (ngSubmit)="submitGroup()">
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Nombre del grupo</label>
+                <input class="ph-input" name="groupName" [ngModel]="groupName()" (ngModelChange)="groupName.set($event)" placeholder="1° A" required maxlength="30" />
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Grado</label>
+                <input class="ph-input" name="groupGrade" [ngModel]="groupGrade()" (ngModelChange)="groupGrade.set($event)" placeholder="1° Primaria" required maxlength="60" />
+              </div>
+            </div>
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Aula</label>
+                <input class="ph-input" name="groupRoom" [ngModel]="groupRoom()" (ngModelChange)="groupRoom.set($event)" placeholder="Aula 04" required maxlength="40" />
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Capacidad</label>
+                <input class="ph-input" type="number" [ngModel]="groupCapacity()" (ngModelChange)="groupCapacity.set($event)" min="1" max="100" required />
+              </div>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Docente titular</label>
+              <select class="ph-select" name="groupTeacher" [ngModel]="groupTeacherId()" (ngModelChange)="groupTeacherId.set($event)">
+                <option value="">Sin asignar</option>
+                @for (teacher of teachers(); track teacher.id) { <option [value]="teacher.id">{{ teacher.name }}</option> }
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showGroupForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="group-form" [disabled]="mutationBusy() || !groupName().trim() || !groupGrade().trim() || !groupRoom().trim()">
+            {{ mutationBusy() ? 'Guardando…' : 'Guardar grupo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- USER FORM MODAL -->
+  @if (showUserForm()) {
+    <div class="ph-modal-backdrop" (click)="showUserForm.set(false)" (keydown.escape)="showUserForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" aria-labelledby="user-form-heading" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2 id="user-form-heading">Crear usuario</h2><p>La persona podrá iniciar sesión con estas credenciales.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showUserForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="user-form" (ngSubmit)="submitUser()">
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre completo</label>
+              <input class="ph-input" name="userName" [ngModel]="userName()" (ngModelChange)="userName.set($event)" required minlength="2" maxlength="120" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Correo electrónico</label>
+              <input class="ph-input" name="userEmail" type="email" [ngModel]="userEmail()" (ngModelChange)="userEmail.set($event)" required maxlength="254" />
+            </div>
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Rol</label>
+                <select class="ph-select" name="userRole" [ngModel]="userRole()" (ngModelChange)="userRole.set($event)">
+                  <option value="TEACHER">Docente</option>
+                  <option value="ADMIN">Administrador</option>
+                  <option value="PARENT">Padre / Tutor</option>
+                  <option value="STUDENT">Estudiante</option>
+                </select>
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Contraseña temporal</label>
+                <input class="ph-input" name="userPassword" type="password" autocomplete="new-password" [ngModel]="userPassword()" (ngModelChange)="userPassword.set($event)" required minlength="12" maxlength="72" />
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--ph-secondary);margin:0">Usa al menos 12 caracteres y comparte la clave temporal de forma segura.</p>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showUserForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="user-form" [disabled]="mutationBusy() || userPassword().length < 12 || !userEmail() || !userName().trim()">
+            {{ mutationBusy() ? 'Creando…' : 'Crear usuario' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- CHANGE PASSWORD MODAL -->
+  @if (showChangePassword()) {
+    <div class="ph-modal-backdrop" (click)="showChangePassword.set(false)" (keydown.escape)="showChangePassword.set(false)">
+      <div class="ph-modal ph-modal-sm" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>Cambiar contraseña</h2><p>Se cerrará tu sesión al guardar la nueva clave.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showChangePassword.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="change-pwd-form" (ngSubmit)="submitPasswordChange()">
+            <div class="ph-form-group">
+              <label class="ph-label">Contraseña actual</label>
+              <input class="ph-input" name="currentPassword" type="password" autocomplete="current-password" [ngModel]="currentPassword()" (ngModelChange)="currentPassword.set($event)" required />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Nueva contraseña (mínimo 12 caracteres)</label>
+              <input class="ph-input" name="newPassword" type="password" autocomplete="new-password" [ngModel]="newPassword()" (ngModelChange)="newPassword.set($event)" minlength="12" maxlength="72" required />
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showChangePassword.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="change-pwd-form" [disabled]="mutationBusy() || !currentPassword() || newPassword().length < 12">
+            {{ mutationBusy() ? 'Guardando…' : 'Actualizar contraseña' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- BULK GRADE FORM -->
+  @if (showBulkForm()) {
+    <div class="ph-modal-backdrop" (click)="showBulkForm.set(false)" (keydown.escape)="showBulkForm.set(false)">
+      <div class="ph-modal ph-modal-lg" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>Captura masiva de calificaciones</h2><p>Registra o actualiza la nota de todos los alumnos del grupo en un paso.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showBulkForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (bulkError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ bulkError() }}</div> }
+          <div class="ph-form-row" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px">
+            <div class="ph-form-group">
+              <label class="ph-label">Grupo</label>
+              <select class="ph-select" [ngModel]="bulkGroupId()" (ngModelChange)="bulkGroupId.set($event)">
+                @for (g of groups(); track g.id) { <option [value]="g.id">{{ g.name }} · {{ g.grade }}</option> }
+              </select>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Materia</label>
+              <select class="ph-select" [ngModel]="bulkSubjectId()" (ngModelChange)="bulkSubjectId.set($event)">
+                @for (s of subjects(); track s.id) { <option [value]="s.id">{{ s.name }}</option> }
+              </select>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Periodo</label>
+              <select class="ph-select" [ngModel]="bulkPeriod()" (ngModelChange)="bulkPeriod.set($event)">
+                <option value="Q1">1er Bimestre</option>
+                <option value="Q2">2do Bimestre</option>
+                <option value="Q3">3er Bimestre</option>
+                <option value="Q4">4to Bimestre</option>
+                <option value="FINAL">Final</option>
+              </select>
+            </div>
+          </div>
+          <div style="max-height:300px;overflow-y:auto">
+            <table class="ph-table">
+              <thead><tr><th>Alumno</th><th>Matrícula</th><th style="width:140px">Calificación (0–10)</th></tr></thead>
+              <tbody>
+                @for (s of bulkGroupStudents(); track s.id) {
+                  <tr>
+                    <td><div class="ph-person-cell"><div class="ph-avatar ph-avatar-sm">{{ initials(s.name) }}</div><strong>{{ s.name }}</strong></div></td>
+                    <td style="color:var(--ph-secondary)">{{ s.registrationNumber }}</td>
+                    <td>
+                      <input class="ph-input" type="number" min="0" max="10" step="0.1" style="width:110px"
+                        [ngModel]="getBulkValue(s.id)" (ngModelChange)="setBulkValue(s.id, +$event)" />
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="3"><div class="ph-empty"><p>Selecciona un grupo para ver los alumnos.</p></div></td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="ph-modal__footer">
+          <span style="font-size:12px;color:var(--ph-secondary);margin-right:auto">{{ bulkGroupStudents().length }} alumnos · se sobreescribe si ya existe nota</span>
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showBulkForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="button" (click)="submitBulkGrades()" [disabled]="bulkBusy() || !bulkGroupStudents().length">
+            {{ bulkBusy() ? 'Guardando…' : 'Guardar todas las notas' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- GRADE FORM -->
+  @if (showGradeForm()) {
+    <div class="ph-modal-backdrop" (click)="showGradeForm.set(false)" (keydown.escape)="showGradeForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>{{ editingGradeId() ? 'Editar calificación' : 'Registrar calificación' }}</h2><p>Asigna una calificación de 0 a 10 por materia y periodo.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showGradeForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="grade-form" (ngSubmit)="submitGrade()">
+            @if (!editingGradeId()) {
+              <div class="ph-form-group">
+                <label class="ph-label">Alumno</label>
+                <select class="ph-select" name="gradeStudent" [ngModel]="gradeStudentId()" (ngModelChange)="gradeStudentId.set($event)" required>
+                  @for (s of students(); track s.id) { <option [value]="s.id">{{ s.name }} — {{ s.group }}</option> }
+                </select>
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Materia</label>
+                <select class="ph-select" name="gradeSubject" [ngModel]="gradeSubjectId()" (ngModelChange)="gradeSubjectId.set($event)" required>
+                  @for (sub of subjects(); track sub.id) { <option [value]="sub.id">{{ sub.name }}</option> }
+                </select>
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Periodo</label>
+                <select class="ph-select" name="gradePeriod" [ngModel]="gradePeriod()" (ngModelChange)="gradePeriod.set($event)" required>
+                  <option value="Q1">1er Bimestre</option>
+                  <option value="Q2">2do Bimestre</option>
+                  <option value="Q3">3er Bimestre</option>
+                  <option value="Q4">4to Bimestre</option>
+                  <option value="FINAL">Final</option>
+                </select>
+              </div>
+            }
+            <div class="ph-form-group">
+              <label class="ph-label">Calificación (0–10)</label>
+              <input class="ph-input" type="number" name="gradeValue" min="0" max="10" step="0.1" [ngModel]="gradeValue()" (ngModelChange)="gradeValue.set(+$event)" required />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Notas (opcional)</label>
+              <input class="ph-input" name="gradeNotes" [ngModel]="gradeNotes()" (ngModelChange)="gradeNotes.set($event)" maxlength="300" />
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showGradeForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="grade-form" [disabled]="mutationBusy()">
+            {{ mutationBusy() ? 'Guardando…' : 'Guardar calificación' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- SUBJECT FORM -->
+  @if (showSubjectForm()) {
+    <div class="ph-modal-backdrop" (click)="showSubjectForm.set(false)" (keydown.escape)="showSubjectForm.set(false)">
+      <div class="ph-modal ph-modal-sm" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>Nueva materia</h2><p>Agrega una materia al catálogo del colegio.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showSubjectForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="subject-form" (ngSubmit)="submitSubject()">
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre de la materia</label>
+              <input class="ph-input" name="subjectName" [ngModel]="subjectName()" (ngModelChange)="subjectName.set($event)" placeholder="Ej. Matemáticas" required maxlength="80" />
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showSubjectForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="subject-form" [disabled]="mutationBusy() || !subjectName().trim()">
+            {{ mutationBusy() ? 'Guardando…' : 'Crear materia' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- REPORT FORM -->
+  @if (showReportForm()) {
+    <div class="ph-modal-backdrop" (click)="showReportForm.set(false)" (keydown.escape)="showReportForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>{{ editingReportId() ? 'Editar reporte' : 'Nuevo reporte' }}</h2><p>Registra observaciones o comunicados para padres.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showReportForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="report-form" (ngSubmit)="submitReport()">
+            <div class="ph-form-group">
+              <label class="ph-label">Título</label>
+              <input class="ph-input" name="reportTitle" [ngModel]="reportTitle()" (ngModelChange)="reportTitle.set($event)" placeholder="Ej. Reunión de padres" required maxlength="140" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Grupo (opcional)</label>
+              <select class="ph-select" name="reportGroup" [ngModel]="reportGroupId()" (ngModelChange)="reportGroupId.set($event)">
+                <option value="">Sin grupo específico</option>
+                @for (group of groups(); track group.id) { <option [value]="group.id">{{ group.name }} · {{ group.grade }}</option> }
+              </select>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Contenido</label>
+              <textarea class="ph-input" name="reportBody" rows="5" style="resize:vertical" [ngModel]="reportBody()" (ngModelChange)="reportBody.set($event)" required maxlength="2000"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showReportForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="report-form" [disabled]="mutationBusy() || !reportTitle().trim() || !reportBody().trim()">
+            {{ mutationBusy() ? 'Guardando…' : 'Guardar reporte' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- CYCLE FORM -->
+  @if (showCycleForm()) {
+    <div class="ph-modal-backdrop" (click)="showCycleForm.set(false)" (keydown.escape)="showCycleForm.set(false)">
+      <div class="ph-modal ph-modal-sm" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>{{ editingCycleId() ? 'Editar ciclo' : 'Nuevo ciclo escolar' }}</h2><p>Define el nombre y fechas del ciclo.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showCycleForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          <form id="cycle-form" (ngSubmit)="submitCycle()">
+            <div class="ph-form-group">
+              <label class="ph-label">Nombre del ciclo</label>
+              <input class="ph-input" name="cycleName" [ngModel]="cycleName()" (ngModelChange)="cycleName.set($event)" placeholder="Ej. 2026-2027" required maxlength="40" />
+            </div>
+            <div class="ph-form-row">
+              <div class="ph-form-group">
+                <label class="ph-label">Fecha de inicio</label>
+                <input class="ph-input" type="date" name="cycleStart" [ngModel]="cycleStart()" (ngModelChange)="cycleStart.set($event)" required />
+              </div>
+              <div class="ph-form-group">
+                <label class="ph-label">Fecha de fin</label>
+                <input class="ph-input" type="date" name="cycleEnd" [ngModel]="cycleEnd()" (ngModelChange)="cycleEnd.set($event)" required />
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showCycleForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="cycle-form" [disabled]="mutationBusy() || !cycleName().trim() || !cycleStart() || !cycleEnd()">
+            {{ mutationBusy() ? 'Guardando…' : 'Guardar ciclo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- MAIL / COMMUNIQUE FORM -->
+  @if (showMailForm()) {
+    <div class="ph-modal-backdrop" (click)="showMailForm.set(false)" (keydown.escape)="showMailForm.set(false)">
+      <div class="ph-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="ph-modal__header">
+          <div><h2>Enviar comunicado</h2><p>El correo se enviará a los destinatarios seleccionados.</p></div>
+          <button class="ph-modal__close" type="button" aria-label="Cerrar" (click)="showMailForm.set(false)">×</button>
+        </div>
+        <div class="ph-modal__body">
+          @if (formError()) { <div class="ph-alert ph-alert-error"><i class="bi bi-exclamation-circle"></i> {{ formError() }}</div> }
+          @if (mailSuccess()) { <div class="ph-alert ph-alert-success"><i class="bi bi-check-circle"></i> {{ mailSuccess() }}</div> }
+          <form id="mail-form" (ngSubmit)="submitCommunique()">
+            <div class="ph-form-group">
+              <label class="ph-label">Asunto</label>
+              <input class="ph-input" name="mailSubject" [ngModel]="mailSubject()" (ngModelChange)="mailSubject.set($event)" placeholder="Ej. Reunión de padres de familia" required maxlength="200" />
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Destinatarios</label>
+              <select class="ph-select" name="mailGroupId" [ngModel]="mailGroupId()" (ngModelChange)="mailGroupId.set($event)">
+                <option value="">Todos los padres vinculados</option>
+                @for (g of groups(); track g.id) { <option [value]="g.id">Padres de {{ g.name }} · {{ g.grade }}</option> }
+              </select>
+            </div>
+            <div class="ph-form-group">
+              <label class="ph-label">Mensaje</label>
+              <textarea class="ph-input" name="mailBody" rows="6" style="resize:vertical" [ngModel]="mailBody()" (ngModelChange)="mailBody.set($event)" required maxlength="3000"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="ph-modal__footer">
+          <button class="ph-btn ph-btn-secondary" type="button" (click)="showMailForm.set(false)">Cancelar</button>
+          <button class="ph-btn ph-btn-primary" type="submit" form="mail-form" [disabled]="mailBusy() || !mailSubject().trim() || !mailBody().trim()">
+            @if (mailBusy()) { <span class="ph-spinner ph-spinner-white"></span> Enviando… }
+            @else { <i class="bi bi-send"></i> Enviar comunicado }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+<!-- Spin class for refresh icon -->
+<style>
+  .spin { animation: spin 1s linear infinite; }
+</style>

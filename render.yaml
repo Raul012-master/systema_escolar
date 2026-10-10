@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: sistema-escolar-api
+    runtime: node
+    rootDir: api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        value: sistema-escolar-fec8f
+      - key: FIREBASE_WEB_API_KEY
+        value: AIzaSyCAePcY78xQgxp5G4_Xk1naPg4beT7BbI0
+      - key: SCHOOL_NAME
+        value: Colegio del Valle
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        value: systemaescolar@gmail.com
+      - key: SMTP_FROM
+        value: "Sistema Escolar <systemaescolar@gmail.com>"
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        sync: false
+      - key: WEB_ORIGIN
+        value: https://sistema-escolar-fec8f.web.app

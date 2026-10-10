@@ -1,0 +1,23 @@
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import { authRouter } from './auth.routes.js';
+import { schoolRouter } from './school.routes.js';
+import { gradesRouter } from './grades.routes.js';
+import { extRouter } from './ext.routes.js';
+
+const app = express();
+const origin = process.env['WEB_ORIGIN'] ?? 'http://localhost:4200';
+
+app.set('trust proxy', 1);
+app.use(cors({ origin, credentials: true }));
+app.use(express.json());
+
+app.get('/health', (_req, res) => res.json({ ok: true }));
+app.use('/auth', authRouter);
+app.use('/school', schoolRouter);
+app.use('/grades', gradesRouter);
+app.use('/ext', extRouter);
+
+const port = Number(process.env['PORT'] ?? 3000);
+app.listen(port, () => console.log(`API escolar corriendo en puerto ${port}`));

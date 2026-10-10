@@ -1,0 +1,24 @@
+{
+  "name": "sistema-escolar-firebase-functions",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "deploy": "firebase deploy --only functions,firestore,hosting",
+    "create-admin": "node scripts/create-admin.mjs"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.5.0",
+    "nodemailer": "^7.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/nodemailer": "^6.4.21",
+    "typescript": "~5.9.3"
+  }
+}
