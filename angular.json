@@ -54,7 +54,8 @@
                   "maximumError": "28kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "optimization": { "scripts": true, "styles": { "minify": true, "inlineCritical": false }, "fonts": true }
             },
             "development": {
               "optimization": false,
@@ -63,6 +64,9 @@
             }
           },
           "defaultConfiguration": "production"
+        },
+        "extract-i18n": {
+          "builder": "@angular/build:extract-i18n"
         },
         "serve": {
           "builder": "@angular/build:dev-server",
